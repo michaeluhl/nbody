@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     static TOTAL_TIME: f64 = 200.0 * 365.24;
     static DT: f64 = 1.0;
-    static O_DT: f64 = 0.1 * 365.24;
+    static O_DT: f64 = 0.01 * 365.24;
 
     let total_increments: usize = (TOTAL_TIME / DT).floor() as usize;
     let o_intervals: usize = (O_DT / DT).floor() as usize;
@@ -42,17 +42,23 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut sol_e: Array2<f64> = Array::zeros((n_steps, 2));
 
     let mut a: Array2<f64> = Array::zeros((s.n, 3));
+    let mut oa = a.clone();
 
+    s.accel(&mut a);
     for i in 0..total_increments {
         if i % o_intervals == 0 {
+            let o_idx = i / o_intervals;
             // println!("Output at {}, {}, {}, {}", i / o_intervals, n_steps, i, total_increments);
-            sol_e.slice_mut(s![i / o_intervals, ..]).assign(&s.energy());
+            sol_e.slice_mut(s![o_idx, ..]).assign(&s.energy());
             sol_t[i / o_intervals] = DT * (i as f64);
-            sol_x.slice_mut(s![i / o_intervals, .., ..]).assign(&s.x);
+            sol_x.slice_mut(s![o_idx, .., ..]).assign(&s.x);
         }
+        // s.v += &(&a * DT);
+        // s.x += &(&s.v * DT);
+        s.x += &(&s.v * DT + 0.5 * &a * DT * DT);
+        oa.assign(&a);
         s.accel(&mut a);
-        s.v += &(&a * DT);
-        s.x += &(&s.v * DT);
+        s.v += &((&a + & oa) * DT / 2.0);
     }
 
     write_npy("sys_x.npy", &sol_x)?;
